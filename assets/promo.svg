@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <!-- subtle grid -->
+  <g stroke="#ffffff" stroke-opacity="0.04">
+    <path d="M0 105H1200M0 210H1200M0 315H1200M0 420H1200M0 525H1200"/>
+    <path d="M150 0V630M300 0V630M450 0V630M600 0V630M750 0V630M900 0V630M1050 0V630"/>
+  </g>
+
+  <!-- title -->
+  <text x="80" y="150" font-size="64" font-weight="700" fill="#f8fafc" letter-spacing="-1">Agent Memory Engine</text>
+  <rect x="80" y="172" width="180" height="6" rx="3" fill="url(#accent)"/>
+  <text x="80" y="228" font-size="28" fill="#cbd5e1">Local-first memory for AI agents, as an MCP server.</text>
+  <text x="80" y="268" font-size="22" fill="#94a3b8">Remembers. Recalls by meaning, keyword, time and relationship. No server, no API key.</text>
+
+  <!-- flow diagram -->
+  <g font-size="20" fill="#e2e8f0" text-anchor="middle">
+    <!-- agent -->
+    <rect x="80" y="340" width="200" height="90" rx="16" fill="#111827" stroke="#334155" stroke-width="2"/>
+    <text x="180" y="378" font-weight="600">Any agent</text>
+    <text x="180" y="406" font-size="16" fill="#94a3b8">Claude · Cursor · yours</text>
+
+    <!-- arrow -->
+    <path d="M285 385H345" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M338 377l12 8-12 8" fill="none" stroke="#a78bfa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="315" y="365" font-size="14" fill="#67e8f9">MCP</text>
+
+    <!-- engine -->
+    <rect x="350" y="325" width="300" height="120" rx="18" fill="#0b1220" stroke="url(#accent)" stroke-width="2.5" filter="url(#glow)"/>
+    <text x="500" y="370" font-size="24" font-weight="700" fill="#f8fafc">memory_remember</text>
+    <text x="500" y="408" font-size="24" font-weight="700" fill="#f8fafc">memory_recall</text>
+
+    <!-- arrow -->
+    <path d="M655 385H715" stroke="url(#accent)" stroke-width="3" stroke-linecap="round"/>
+    <path d="M708 377l12 8-12 8" fill="none" stroke="#a78bfa" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- stores -->
+    <g>
+      <rect x="720" y="300" width="400" height="52" rx="12" fill="#111827" stroke="#334155" stroke-width="2"/>
+      <circle cx="748" cy="326" r="8" fill="#22d3ee"/>
+      <text x="920" y="333" font-size="18">Vectors · HNSW + BM25 hybrid recall</text>
+      <rect x="720" y="360" width="400" height="52" rx="12" fill="#111827" stroke="#334155" stroke-width="2"/>
+      <circle cx="748" cy="386" r="8" fill="#818cf8"/>
+      <text x="920" y="393" font-size="18">Graph · relations, causes, provenance</text>
+      <rect x="720" y="420" width="400" height="52" rx="12" fill="#111827" stroke="#334155" stroke-width="2"/>
+      <circle cx="748" cy="446" r="8" fill="#a78bfa"/>
+      <text x="920" y="453" font-size="18">Audit · hash-chained log, snapshots</text>
+    </g>
+  </g>
+
+  <!-- install command -->
+  <rect x="80" y="496" width="1040" height="64" rx="12" fill="#020617" stroke="#334155" stroke-width="2"/>
+  <text x="104" y="537" font-family="'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="22" fill="#e2e8f0"><tspan fill="#64748b">$ </tspan>claude mcp add memory -s user -- npx -y agent-memory-engine</text>
+  <text x="80" y="598" font-size="16" fill="#64748b">Local embeddings, 384-d, 23 MB model cached once  ·  MIT</text>
+  <text x="1120" y="598" font-size="16" fill="#64748b" text-anchor="end">npm: agent-memory-engine  ·  github.com/rgolabs/myMem</text>
+</svg>

@@ -1,9 +1,19 @@
 # Agent Memory Engine
 
+[![npm version](https://img.shields.io/npm/v/agent-memory-engine.svg?color=22d3ee&label=npm)](https://www.npmjs.com/package/agent-memory-engine)
+[![npm downloads](https://img.shields.io/npm/dm/agent-memory-engine.svg?color=a78bfa)](https://www.npmjs.com/package/agent-memory-engine)
+[![license MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![node >= 20](https://img.shields.io/badge/node-%3E%3D20-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
+[![MCP](https://img.shields.io/badge/protocol-MCP-f8fafc.svg)](https://modelcontextprotocol.io)
+
+<p align="center"><img src="https://raw.githubusercontent.com/rgolabs/myMem/main/assets/promo.png" alt="Agent Memory Engine: any agent connects over MCP to memory_remember and memory_recall, backed by vectors, graph and an audit log. Install: claude mcp add memory -s user -- npx -y agent-memory-engine" width="900"></p>
+
 A local-first memory substrate for AI agents, delivered as an **MCP server** any agent framework can
 link to, plus a CLI and a TypeScript library. It stores what an agent observes, decides and learns,
 and recalls it by similarity, keyword, filter, time and explicit relationship. Everything lives in
 files under one directory: no server process to run, no API key, no per-query fee.
+
+**Install:** `npm install -g agent-memory-engine` · **Package:** [npmjs.com/package/agent-memory-engine](https://www.npmjs.com/package/agent-memory-engine) · **Source:** [github.com/rgolabs/myMem](https://github.com/rgolabs/myMem)
 
 Built from [agent-memory-engine-spec.md](agent-memory-engine-spec.md). See
 [What is implemented](#what-is-implemented-against-the-spec) for the exact coverage.
