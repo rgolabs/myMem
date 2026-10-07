@@ -1,6 +1,6 @@
 {
   "name": "agent-memory-engine",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Local-first memory for AI agents as an MCP server: semantic + keyword recall, typed memories, graph relations, audit log, snapshots. No server, no API key.",
   "type": "module",
   "license": "MIT",
