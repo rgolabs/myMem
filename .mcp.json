@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "node",
+      "args": ["dist/mcp/server.js"],
+      "env": {
+        "MEM_ROOT": ".memory",
+        "MEM_PROFILE": "standard"
+      }
+    }
+  }
+}

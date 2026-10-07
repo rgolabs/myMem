@@ -1,0 +1,63 @@
+{
+  "name": "agent-memory-engine",
+  "version": "0.1.0",
+  "description": "Local-first memory for AI agents as an MCP server: semantic + keyword recall, typed memories, graph relations, audit log, snapshots. No server, no API key.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Rajesh Govindarajan",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "agent",
+    "memory",
+    "vector-store",
+    "hnsw",
+    "embeddings",
+    "knowledge-graph",
+    "claude",
+    "cursor",
+    "llm"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "agent-memory-engine": "dist/mcp/server.js",
+    "mem-mcp": "dist/mcp/server.js",
+    "mem": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && chmod +x dist/cli.js dist/mcp/server.js",
+    "clean": "rm -rf dist",
+    "dev:mcp": "tsx src/mcp/server.ts",
+    "test": "tsx --test test/*.test.ts",
+    "bench": "tsx bench/bench.ts",
+    "prepack": "npm run clean && npm run build",
+    "prepublishOnly": "npm test"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0"
+  }
+}

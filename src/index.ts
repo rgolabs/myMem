@@ -1,0 +1,14 @@
+export { Collection, type CollectionStats, type CompactResult, type CompactionPolicy } from './core/vector-store.js';
+export { GraphStore, type GNode, type GEdge, type GHyperedge, type QueryResult } from './core/graph-store.js';
+export { HNSW } from './core/hnsw.js';
+export { WitnessLog, type WitnessEntry } from './core/witness.js';
+export { Branch } from './core/branch.js';
+export { Bm25Index, rrf, rsf, tokenize } from './core/lexical.js';
+export { parseCypher } from './core/cypher.js';
+export { MemError, type MemErrorCode } from './core/errors.js';
+export { writeSnapshot, readSnapshot } from './core/snapshot.js';
+export * from './core/types.js';
+export * from './core/distance.js';
+export { AgentMemory, type AgentMemoryOptions, type RememberInput, type RememberResult, type RecallInput, type RecallResult, type RecallHit } from './memory/agent-memory.js';
+export { createEmbedder, resolveEmbedder, NgramEmbedder, TransformersEmbedder, MODELS, DEFAULT_MODEL, type EmbeddingProvider, type EmbedRole } from './embedding/index.js';
+export { loadConfig, type EngineConfig, type Profile } from './config.js';

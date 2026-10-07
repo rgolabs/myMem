@@ -1,0 +1,8 @@
+src
+test
+bench
+.memory
+*.snap
+tsconfig.json
+.mcp.json
+agent-memory-engine-spec.md

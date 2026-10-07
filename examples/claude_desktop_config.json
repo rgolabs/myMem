@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "agent-memory-engine"],
+      "env": {
+        "MEM_ROOT": "/Users/you/.agent-memory"
+      }
+    }
+  }
+}
