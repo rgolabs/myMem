@@ -87,7 +87,7 @@ const { results } = await memory.recall({ text: 'how do we deploy?', k: 5 });
 ### Running from source
 
 ```bash
-git clone <this repository> && cd agent-memory-engine
+git clone https://github.com/rgolabs/myMem.git && cd myMem
 npm install && npm run build && npm test
 node dist/mcp/server.js --help
 ```
