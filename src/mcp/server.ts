@@ -74,17 +74,47 @@ export interface Engine {
   embedder: EmbeddingProvider | null;
   embedderError: string | null;
   fallbackActivated: boolean;
+  /** Load the embedder now (idempotent). With lazy start this runs on the first tool call. */
+  ensureEmbedder: () => Promise<void>;
   open: (namespace: string) => AgentMemory;
   closeAll: () => void;
 }
 
-export async function createEngine(config: EngineConfig, log: (m: string) => void = (m) => console.error(m)): Promise<Engine> {
+/**
+ * Create the engine. `lazy` (default when MEM_LAZY_EMBEDDER is not '0') defers loading the embedding
+ * model until the first tool that needs it, so the MCP handshake is instant and cheap: on small
+ * machines the model load (ONNX runtime + ~23 MB model) is the biggest startup spike.
+ */
+export async function createEngine(config: EngineConfig, log: (m: string) => void = (m) => console.error(m), opts: { lazy?: boolean } = {}): Promise<Engine> {
   const namespaces = new Map<string, AgentMemory>();
+  let loading: Promise<void> | null = null;
+  const lazy = opts.lazy ?? process.env.MEM_LAZY_EMBEDDER !== '0';
   const engine: Engine = {
     config,
     embedder: null,
     embedderError: null,
     fallbackActivated: false,
+    ensureEmbedder() {
+      if (engine.embedder) return Promise.resolve();
+      if (!loading) {
+        loading = (async () => {
+          try {
+            const r = await resolveEmbedder({ spec: config.embedder, allowFallback: config.allowFallback, log });
+            engine.embedder = r.provider;
+            engine.fallbackActivated = r.fallbackActivated;
+            engine.embedderError = null;
+            if (r.warning) log(`[mem] WARNING ${r.warning}`);
+            log(`[mem] embedder ready: ${r.provider.name} (rss ${Math.round(process.memoryUsage().rss / 1048576)} MB)`);
+          } catch (e: any) {
+            engine.embedderError = e?.message ?? String(e);
+            log(`[mem] embedder unavailable: ${engine.embedderError}`);
+          } finally {
+            loading = null;
+          }
+        })();
+      }
+      return loading;
+    },
     open(namespace: string) {
       if (!engine.embedder) throw new MemError('EMBEDDER_UNAVAILABLE', engine.embedderError ?? 'embedder not initialised');
       let m = namespaces.get(namespace);
@@ -103,15 +133,7 @@ export async function createEngine(config: EngineConfig, log: (m: string) => voi
       namespaces.clear();
     },
   };
-  try {
-    const r = await resolveEmbedder({ spec: config.embedder, allowFallback: config.allowFallback, log });
-    engine.embedder = r.provider;
-    engine.fallbackActivated = r.fallbackActivated;
-    if (r.warning) log(`[mem] WARNING ${r.warning}`);
-  } catch (e: any) {
-    engine.embedderError = e?.message ?? String(e);
-    log(`[mem] embedder unavailable: ${engine.embedderError}`);
-  }
+  if (!lazy) await engine.ensureEmbedder();
   return engine;
 }
 
@@ -142,7 +164,9 @@ export function buildServer(engine: Engine) {
       semantic: engine.embedder?.semantic ?? false,
       fallbackActivated: engine.fallbackActivated,
       ready: engine.embedder?.isReady() ?? false,
+      lazy: !engine.embedder && !engine.embedderError ? 'not loaded yet (loads on first memory tool call)' : undefined,
       error: engine.embedderError,
+      rssMB: Math.round(process.memoryUsage().rss / 1048576),
       identity: engine.embedder?.identity() ?? null,
     }),
   };
@@ -154,6 +178,7 @@ export function buildServer(engine: Engine) {
         try {
           const ns = args?.namespace ?? config.namespace;
           const { namespace: _n, ...rest } = args ?? {};
+          if (t.needsMemory !== false || t.name === 'memory_info') await engine.ensureEmbedder();
           const mem = t.needsMemory === false ? (null as unknown as AgentMemory) : engine.open(ns);
           const result = await t.run(mem, t.needsMemory === false ? (args ?? {}) : rest, ctx);
           return { content: [{ type: 'text', text: JSON.stringify(result ?? null, replacer, 2) }] };
@@ -166,7 +191,7 @@ export function buildServer(engine: Engine) {
   }
   server.registerResource('guide', 'memory://guide', { title: 'Memory protocol', description: 'How and when to use the memory tools', mimeType: 'text/plain' }, async (uri) => ({ contents: [{ uri: uri.href, text: SERVER_INSTRUCTIONS }] }));
   server.registerResource('stats', 'memory://stats', { title: 'Memory stats', description: 'Live statistics for the default namespace', mimeType: 'application/json' }, async (uri) => ({
-    contents: [{ uri: uri.href, text: JSON.stringify(engine.embedder ? engine.open(config.namespace).stats() : { error: engine.embedderError }, replacer, 2) }],
+    contents: [{ uri: uri.href, text: JSON.stringify(await engine.ensureEmbedder().then(() => (engine.embedder ? engine.open(config.namespace).stats() : { error: engine.embedderError })), replacer, 2) }],
   }));
   return { server, live };
 }
@@ -185,7 +210,7 @@ export async function main(argv = process.argv.slice(2)) {
   const engine = await createEngine(config);
   const transportKind = args.transport ?? (process.env.MEM_TRANSPORT as ServeArgs['transport']) ?? 'stdio';
   const { server, live } = buildServer(engine);
-  console.error(`[mem] agent-memory ${pkg.version} root=${config.root} namespace=${config.namespace} profile=${config.profile} embedder=${engine.embedder?.name ?? 'UNAVAILABLE'} tools=${live.length} transport=${transportKind}`);
+  console.error(`[mem] agent-memory ${pkg.version} root=${config.root} namespace=${config.namespace} profile=${config.profile} embedder=${engine.embedder?.name ?? (engine.embedderError ? 'UNAVAILABLE' : `${config.embedder} (lazy)`)} tools=${live.length} transport=${transportKind} rss=${Math.round(process.memoryUsage().rss / 1048576)}MB`);
   if (transportKind === 'sse' || transportKind === 'http') {
     const { startHttpServer } = await import('./http.js');
     const running = await startHttpServer(engine, { host: args.host, port: args.port, token: args.token, cors: args.cors });

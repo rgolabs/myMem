@@ -46,6 +46,18 @@ export const MODELS: Record<string, ModelSpec> = {
 
 export const DEFAULT_MODEL = 'all-MiniLM-L6-v2';
 
+/**
+ * ONNX Runtime threads. Each intra-op thread costs CPU and memory arena space; on small VMs
+ * (1 to 2 vCPUs) one thread is both lighter and faster. Override with MEM_ONNX_THREADS.
+ */
+export function onnxThreads(): number {
+  const env = process.env.MEM_ONNX_THREADS;
+  if (env && Number.isInteger(parseInt(env, 10)) && parseInt(env, 10) > 0) return parseInt(env, 10);
+  if (process.env.MEM_LOW_MEMORY === '1') return 1;
+  const cores = os.cpus().length || 1;
+  return cores <= 2 ? 1 : Math.min(4, Math.floor(cores / 2));
+}
+
 export function defaultModelCacheDir(): string {
   return process.env.MEM_MODEL_CACHE || path.join(os.homedir(), '.cache', 'agent-memory', 'models');
 }
@@ -90,7 +102,11 @@ export class TransformersEmbedder implements EmbeddingProvider {
         tf.env.allowLocalModels = true;
         tf.env.allowRemoteModels = !this.offline;
         try {
-          const p = await tf.pipeline('feature-extraction', this.spec.hf, { dtype: this.dtype as any });
+          const threads = onnxThreads();
+          const p = await tf.pipeline('feature-extraction', this.spec.hf, {
+            dtype: this.dtype as any,
+            session_options: { intraOpNumThreads: threads, interOpNumThreads: 1, graphOptimizationLevel: 'all' } as any,
+          });
           this.pipe = p as unknown as Pipe;
         } catch (e: any) {
           this.initPromise = null;

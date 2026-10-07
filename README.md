@@ -155,6 +155,36 @@ the error directly. The usual causes are Node older than 20, `npx` not on the PA
 Code uses (give the full path, from `which npx`), or no network for the first model download
 (`MEM_OFFLINE=1` plus a prepopulated cache, or `MEM_ALLOW_FALLBACK=1` for keyword-only recall).
 
+### Small machines (1 GB VMs such as GCP e2-micro, AWS t2.micro)
+
+Measured resident memory of the server process (macOS arm64, Node 22; Linux is similar):
+
+| State | RSS |
+| --- | --- |
+| MCP handshake only (model not loaded, the default lazy start) | ~65 MB |
+| Default model loaded and embedding (`all-MiniLM-L6-v2` q8) | ~190 MB, ~215 MB peak during the one-time 23 MB download |
+| `fp32` model variant | ~360 MB |
+| Lexical fallback (`MEM_EMBEDDER=ngram`) | ~65 MB |
+| `npx` installing the package on a cold cache | ~245 MB extra, and 520 MB of disk |
+
+On a 1 GB box with no swap, `npx` extracting the package while an agent is also running is what
+pushes the machine into the OOM killer. Do this instead:
+
+```bash
+sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+npm install -g agent-memory-engine     # install once, so no per-start extraction
+mem doctor                             # memory, swap, disk and model-cache check with recommendations
+mem init                               # download the model once
+```
+
+Then register the installed binary rather than npx, for example
+`claude mcp add memory -s user -e MEM_LOW_MEMORY=1 -- agent-memory-engine` or `"command": "agent-memory-engine"`
+in a JSON config. `MEM_LOW_MEMORY=1` caps ONNX Runtime at one thread (also the default on machines with
+two or fewer cores; tune with `MEM_ONNX_THREADS`). The model loads lazily on the first memory tool
+call, so the handshake itself costs ~65 MB. If even that is too much, `MEM_EMBEDDER=ngram` runs
+keyword-only recall in ~65 MB total with no native code; the manifest records that the store is
+lexical, and `mem reembed --to onnx:all-MiniLM-L6-v2` upgrades it later.
+
 ### Running from source
 
 ```bash
@@ -187,6 +217,9 @@ npx -y agent-memory-engine [--root DIR] [--namespace NS] [--profile read-only|st
 | `MEM_CAPACITY` | `0` | Records per namespace before compaction runs (0 = unlimited) |
 | `MEM_LEARNING` | unset | `1` lets recorded outcomes influence ranking |
 | `MEM_ACTOR` | `agent` | Actor name written to the audit log |
+| `MEM_LAZY_EMBEDDER` | `1` | Load the model on the first memory tool call instead of at startup; `0` loads eagerly |
+| `MEM_ONNX_THREADS` | 1 on ≤2 cores, else cores/2 (max 4) | ONNX Runtime intra-op threads |
+| `MEM_LOW_MEMORY` | unset | `1` forces one ONNX thread; see Small machines |
 | `MEM_TRANSPORT` | `stdio` | `sse` serves MCP over HTTP (`/sse`, `/messages`, `/mcp`) instead of stdio |
 | `MEM_HTTP_PORT` / `MEM_HTTP_HOST` | `3939` / `127.0.0.1` | Listen address for the HTTP transport |
 | `MEM_HTTP_TOKEN` | unset | Bearer token required by the HTTP transport |
@@ -247,7 +280,7 @@ mem list | get ID | forget ID | stats | info | verify
 mem snapshot [FILE] | mem restore FILE [--namespace NS] [--overwrite]
 mem compact --target N [--policy coherence|lru|lfu] | mem consolidate [--dry-run]
 mem reembed --to onnx:bge-small-en-v1.5 | mem graph "MATCH (n) RETURN n LIMIT 5"
-mem init | mem serve [--profile ...] | mem sse [--port 3939] [--host 127.0.0.1] [--token S]
+mem doctor | mem init | mem serve [--profile ...] | mem sse [--port 3939] [--host 127.0.0.1] [--token S]
 ```
 
 ## Library: the raw vector store

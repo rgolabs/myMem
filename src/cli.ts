@@ -12,6 +12,7 @@
  *   mem consolidate [--dry-run]
  *   mem reembed --to onnx:bge-small-en-v1.5
  *   mem graph "MATCH (n) RETURN n LIMIT 5"
+ *   mem doctor          (memory, swap, disk and model-cache check with recommendations for small machines)
  *   mem init            (download and cache the embedding model)
  *   mem serve [...]     (start the MCP server on stdio)
  *   mem sse [--port 3939] [--host 127.0.0.1] [--token SECRET]   (MCP over HTTP: /sse and /mcp)
@@ -79,7 +80,7 @@ function list(s: unknown): string[] | undefined {
 
 async function run() {
   if (!cmd || v.help) {
-    console.error(`usage: mem <remember|recall|list|get|forget|stats|info|verify|snapshot|restore|compact|consolidate|reembed|graph|init|serve|sse> [options] [text]
+    console.error(`usage: mem <remember|recall|list|get|forget|stats|info|verify|snapshot|restore|compact|consolidate|reembed|graph|doctor|init|serve|sse> [options] [text]
   --root DIR  --namespace NS  --embedder onnx:MODEL|ngram  --allow-fallback  --json
   remember: --kind K --tags a,b --source S --importance 0..1 --supersedes ID
   recall:   --top-k N --kinds a,b --no-hybrid --decay --explain
@@ -102,6 +103,50 @@ async function run() {
     if (v.token) passthrough.push('--token', String(v.token));
     if (v.cors) passthrough.push('--cors', String(v.cors));
     await main(passthrough);
+    return;
+  }
+  if (cmd === 'doctor') {
+    const os = await import('node:os');
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { defaultModelCacheDir, onnxThreads, MODELS, DEFAULT_MODEL } = await import('./embedding/transformers.js');
+    const config = loadConfig({ root: v.root as string | undefined, embedder: v.embedder as string | undefined });
+    const totalMB = Math.round(os.totalmem() / 1048576), freeMB = Math.round(os.freemem() / 1048576);
+    let swapMB: number | null = null;
+    try {
+      const mi = fs.readFileSync('/proc/meminfo', 'utf8');
+      const m = /SwapTotal:\s+(\d+)/.exec(mi);
+      if (m) swapMB = Math.round(parseInt(m[1], 10) / 1024);
+    } catch {}
+    let diskFreeMB: number | null = null;
+    try {
+      const st = fs.statfsSync(fs.existsSync(config.root) ? config.root : os.homedir());
+      diskFreeMB = Math.round((Number(st.bavail) * Number(st.bsize)) / 1048576);
+    } catch {}
+    const cache = defaultModelCacheDir();
+    const spec = MODELS[(config.embedder.replace(/^onnx:/, '').split('@')[0]) || DEFAULT_MODEL];
+    const modelCached = !!spec && fs.existsSync(path.join(cache, spec.hf));
+    const warnings: string[] = [];
+    if (totalMB < 1536) warnings.push(`Only ${totalMB} MB RAM. The server needs ~220 MB with the default model; npx needs ~250 MB more while installing. Install once with 'npm install -g agent-memory-engine' and start it with 'mem serve' or 'agent-memory-engine' instead of npx.`);
+    if (swapMB !== null && swapMB === 0 && totalMB < 2048) warnings.push('No swap. Add 2 GB: sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile');
+    if (diskFreeMB !== null && diskFreeMB < 1500) warnings.push(`Only ${diskFreeMB} MB free disk at ${config.root}. The package needs ~520 MB installed (onnxruntime ships every platform's binary) plus 24 MB of model.`);
+    if (!modelCached) warnings.push(`Model ${config.embedder} is not cached yet; the first use downloads ~23 MB. Run 'mem init' once (needs network).`);
+    if (os.cpus().length <= 2) warnings.push(`Only ${os.cpus().length} vCPU(s): ONNX threads are capped at ${onnxThreads()} (MEM_ONNX_THREADS). Expect ~5 to 20 ms per embedding.`);
+    out({
+      node: process.version,
+      platform: `${os.platform()} ${os.release()} ${os.arch()}`,
+      cpus: os.cpus().length,
+      memoryMB: { total: totalMB, free: freeMB, swap: swapMB },
+      diskFreeMB,
+      root: config.root,
+      embedder: config.embedder,
+      modelCache: { dir: cache, cached: modelCached },
+      onnxThreads: onnxThreads(),
+      lowMemoryMode: process.env.MEM_LOW_MEMORY === '1',
+      expectedRssMB: { lexicalFallback: 70, defaultModelQ8: 220, modelFp32: 360 },
+      warnings,
+      ok: warnings.length === 0,
+    });
     return;
   }
   if (cmd === 'init') {
