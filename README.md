@@ -84,6 +84,39 @@ await memory.remember({ text: 'Deploys go through a canary stage', kind: 'fact',
 const { results } = await memory.recall({ text: 'how do we deploy?', k: 5 });
 ```
 
+### New machine, step by step (Claude Code)
+
+1. **Install Node.js 20 or newer.** Check with `node --version`. If missing, install from
+   https://nodejs.org (LTS) or with your version manager (`nvm install --lts`). `npx` ships with it.
+2. **Install Claude Code** if you have not: `npm install -g @anthropic-ai/claude-code`, then run
+   `claude` once and sign in.
+3. **Register the memory server for your user** (all projects):
+
+   ```bash
+   claude mcp add memory -s user -- npx -y agent-memory-engine
+   ```
+
+   `-s user` stores it in `~/.claude.json` rather than one project. `npx -y` downloads the package
+   on first start and caches it. On Windows use `-- cmd /c npx -y agent-memory-engine`.
+4. **Check it is registered:** `claude mcp list` shows `memory`, and `claude mcp get memory` prints
+   the command. Then start (or restart) a session and type `/mcp`: the server should be connected
+   with tools such as `memory_recall` and `memory_remember`.
+5. **Warm up the model (optional).** The first recall downloads the 23 MB embedding model once into
+   `~/.cache/agent-memory/models`. To do it ahead of time: `npx -y -p agent-memory-engine mem init`.
+6. **Try it.** In Claude Code: "Remember that our deploys go through a canary stage." Then in a new
+   session: "How do we deploy?" Claude should call `memory_recall` and answer from memory.
+7. **Look at what was stored:** `npx -y -p agent-memory-engine mem stats` and
+   `npx -y -p agent-memory-engine mem recall "deploy"`. Files live under `~/.agent-memory/default/`.
+
+Variations: per-project memory with `-e MEM_ROOT=.memory`, separate projects inside one store with
+`-e MEM_NAMESPACE=myproject`, a read-only agent with `-e MEM_PROFILE=read-only`, and
+`claude mcp remove memory -s user` to uninstall.
+
+If `/mcp` shows the server failed: run `npx -y agent-memory-engine --help` in a terminal to see
+the error directly. The usual causes are Node older than 20, `npx` not on the PATH that Claude
+Code uses (give the full path, from `which npx`), or no network for the first model download
+(`MEM_OFFLINE=1` plus a prepopulated cache, or `MEM_ALLOW_FALLBACK=1` for keyword-only recall).
+
 ### Running from source
 
 ```bash
