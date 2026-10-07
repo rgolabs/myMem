@@ -67,6 +67,34 @@ The server tells the agent to **recall before it searches files or databases** a
 durable facts as soon as it learns them**. Adding [examples/CLAUDE.md.snippet](examples/CLAUDE.md.snippet)
 to your project instructions makes that behaviour more reliable.
 
+### Agents that need SSE or Streamable HTTP instead of stdio
+
+Some agents and hosted platforms cannot spawn a local process and expect an MCP URL. Start the same
+server over HTTP:
+
+```bash
+npx -y -p agent-memory-engine mem sse --port 3939
+```
+
+It serves two transports on one port, bound to `127.0.0.1` by default:
+
+| Endpoint | Transport | Point the client at |
+| --- | --- | --- |
+| `GET /sse` + `POST /messages` | HTTP + SSE (the original MCP remote transport) | `http://127.0.0.1:3939/sse` |
+| `/mcp` | Streamable HTTP (current MCP spec, SSE for server-to-client) | `http://127.0.0.1:3939/mcp` |
+| `GET /health` | liveness, session and tool counts | |
+
+Both transports and the stdio server share the same files and embedder, so a stdio agent and an SSE
+agent see one memory. Options: `--host 0.0.0.0` to accept other machines, `--token SECRET` to require
+`Authorization: Bearer SECRET` (EventSource clients may pass `?token=SECRET` on `/sse`),
+`--cors https://app.example.com` for browser clients, `--profile read-only`. The same flags work on
+the server binary: `npx -y agent-memory-engine --transport sse --port 3939`, or set `MEM_TRANSPORT=sse`,
+`MEM_HTTP_PORT`, `MEM_HTTP_HOST`, `MEM_HTTP_TOKEN`, `MEM_HTTP_CORS`.
+
+Claude Code can use it as a remote server too: `claude mcp add --transport sse memory-sse http://127.0.0.1:3939/sse`.
+There is no TLS built in; for anything beyond localhost put it behind a reverse proxy with HTTPS and
+set a token.
+
 ### 2. Use it from the shell (optional)
 
 ```bash
@@ -159,6 +187,10 @@ npx -y agent-memory-engine [--root DIR] [--namespace NS] [--profile read-only|st
 | `MEM_CAPACITY` | `0` | Records per namespace before compaction runs (0 = unlimited) |
 | `MEM_LEARNING` | unset | `1` lets recorded outcomes influence ranking |
 | `MEM_ACTOR` | `agent` | Actor name written to the audit log |
+| `MEM_TRANSPORT` | `stdio` | `sse` serves MCP over HTTP (`/sse`, `/messages`, `/mcp`) instead of stdio |
+| `MEM_HTTP_PORT` / `MEM_HTTP_HOST` | `3939` / `127.0.0.1` | Listen address for the HTTP transport |
+| `MEM_HTTP_TOKEN` | unset | Bearer token required by the HTTP transport |
+| `MEM_HTTP_CORS` | unset | Comma-separated browser origins allowed by the HTTP transport |
 
 Models: `all-MiniLM-L6-v2` (default), `all-MiniLM-L12-v2`, `bge-small-en-v1.5`, `e5-small-v2`,
 `multilingual-e5-small`, `gte-small` (all 384-d, so indexes stay compatible after `memory_reembed`),
@@ -215,7 +247,7 @@ mem list | get ID | forget ID | stats | info | verify
 mem snapshot [FILE] | mem restore FILE [--namespace NS] [--overwrite]
 mem compact --target N [--policy coherence|lru|lfu] | mem consolidate [--dry-run]
 mem reembed --to onnx:bge-small-en-v1.5 | mem graph "MATCH (n) RETURN n LIMIT 5"
-mem init | mem serve [--profile ...]
+mem init | mem serve [--profile ...] | mem sse [--port 3939] [--host 127.0.0.1] [--token S]
 ```
 
 ## Library: the raw vector store
@@ -313,7 +345,7 @@ changing any interface.
 | §9 Learning: outcome feedback, outcome-aware routing, enable/disable/reset, witnessed changes | Implemented. Micro adapters, EWC consolidation, learned re-ranking and configuration optimisation are not implemented |
 | §10 Lifecycle: compaction policies with diversity constraint, snapshots with checksum and audit head, branches with conflict reporting, purge everywhere | Implemented. Compression/quantization, incremental and remote snapshots are not implemented |
 | §11 Governance: namespaces, capability masks, tool profiles with allow/deny lists | Implemented. Replication, consensus and the shared memory service are out of scope for this build |
-| §12 Interfaces: MCP (tool-protocol) server, CLI, TypeScript library | Implemented. Rust core, Node native binding, browser build, HTTP service and SQL extension are not part of this build |
+| §12 Interfaces: MCP (tool-protocol) server over stdio, SSE and Streamable HTTP; CLI; TypeScript library | Implemented. Rust core, Node native binding, browser build, JSON-over-HTTP service and SQL extension are not part of this build |
 | §16 Enhancements: importance at write time, near-duplicate surfacing, validity intervals and `asOf`, structured filters, context-budgeted recall, persisted index, feature matrix in manifest, purge everywhere | Implemented |
 
 Design choices worth knowing:
@@ -340,12 +372,12 @@ src/core        vector-store, hnsw, lexical (BM25 + fusion), filter, graph-store
                 snapshot, branch, distance, fsutil, errors, types
 src/embedding   provider interface, transformers (ONNX models), ngram fallback, resolver
 src/memory      agent-memory (typed memory, sessions, learning, consolidation, lifecycle)
-src/mcp         tools (definitions + profiles), server (stdio)
+src/mcp         tools (definitions + profiles), server (stdio), http (SSE + Streamable HTTP)
 src/cli.ts      command line          bench/bench.ts   benchmark          test/   node:test suites
 ```
 
 ```bash
-npm test     # 21 tests: core, graph + Cypher, memory layer, multi-process, MCP server
+npm test     # 23 tests: core, graph + Cypher, memory layer, multi-process, MCP over stdio, SSE and HTTP
 npm run bench -- --n 20000 --real
 ```
 

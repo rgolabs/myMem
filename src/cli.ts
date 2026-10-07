@@ -13,7 +13,8 @@
  *   mem reembed --to onnx:bge-small-en-v1.5
  *   mem graph "MATCH (n) RETURN n LIMIT 5"
  *   mem init            (download and cache the embedding model)
- *   mem serve [...]     (start the MCP server)
+ *   mem serve [...]     (start the MCP server on stdio)
+ *   mem sse [--port 3939] [--host 127.0.0.1] [--token SECRET]   (MCP over HTTP: /sse and /mcp)
  * Global: --root DIR --namespace NS --embedder SPEC --allow-fallback --json
  */
 import { parseArgs } from 'node:util';
@@ -49,6 +50,11 @@ const { values: v, positionals } = parseArgs({
     to: { type: 'string' },
     overwrite: { type: 'boolean' },
     profile: { type: 'string' },
+    sse: { type: 'boolean' },
+    port: { type: 'string' },
+    host: { type: 'string' },
+    token: { type: 'string' },
+    cors: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
   },
 });
@@ -73,15 +79,16 @@ function list(s: unknown): string[] | undefined {
 
 async function run() {
   if (!cmd || v.help) {
-    console.error(`usage: mem <remember|recall|list|get|forget|stats|info|verify|snapshot|restore|compact|consolidate|reembed|graph|init|serve> [options] [text]
+    console.error(`usage: mem <remember|recall|list|get|forget|stats|info|verify|snapshot|restore|compact|consolidate|reembed|graph|init|serve|sse> [options] [text]
   --root DIR  --namespace NS  --embedder onnx:MODEL|ngram  --allow-fallback  --json
   remember: --kind K --tags a,b --source S --importance 0..1 --supersedes ID
   recall:   --top-k N --kinds a,b --no-hybrid --decay --explain
   compact:  --target N --policy coherence|lru|lfu      consolidate: --dry-run
-  restore:  FILE --namespace NS --overwrite           reembed: --to SPEC`);
+  restore:  FILE --namespace NS --overwrite           reembed: --to SPEC
+  serve:    MCP over stdio [--profile P]              sse: MCP over HTTP [--port 3939] [--host 127.0.0.1] [--token S] [--cors o1,o2]`);
     process.exit(cmd ? 0 : 1);
   }
-  if (cmd === 'serve') {
+  if (cmd === 'serve' || cmd === 'sse') {
     const { main } = await import('./mcp/server.js');
     const passthrough: string[] = [];
     if (v.root) passthrough.push('--root', String(v.root));
@@ -89,6 +96,11 @@ async function run() {
     if (v.embedder) passthrough.push('--embedder', String(v.embedder));
     if (v.profile) passthrough.push('--profile', String(v.profile));
     if (v['allow-fallback']) passthrough.push('--allow-fallback');
+    if (cmd === 'sse' || v.sse) passthrough.push('--transport', 'sse');
+    if (v.port) passthrough.push('--port', String(v.port));
+    if (v.host) passthrough.push('--host', String(v.host));
+    if (v.token) passthrough.push('--token', String(v.token));
+    if (v.cors) passthrough.push('--cors', String(v.cors));
     await main(passthrough);
     return;
   }
